@@ -1,12 +1,6 @@
-from operator import ne
-from re import S
-from django.conf import settings
 import pygame
 import os
 from time import time
-
-import pygame.locals
-from pyscreeze import screenshot 
 class Settings(object):
     Window = pygame.rect.Rect(0,0,960,740)
     playing_feald = pygame.rect.Rect(0,220,960,520)
@@ -40,18 +34,21 @@ class character(pygame.sprite.Sprite):
         self.image = pygame.image.load(os.path.join(Settings.image_path, "TEMP_character_2.png"))
         self.image = pygame.transform.scale(self.image,(100,100))
 
-        self.bullits =pygame.sprite.Group()
+        self.bullets_right =pygame.sprite.Group()
+        self.bullets_left =pygame.sprite.Group()
+        self.bullets_up =pygame.sprite.Group()
+        self.bullets_down =pygame.sprite.Group()
+        self.all_bullets =pygame.sprite.Group()
         self.rect = self.image.get_rect()
         self.rect.center = (x,y)
         self.location = Room(None)
-
         #Character Stats
         self.speed = 0.5
         self.act_speed = self.speed*25
         self.shot_rait=2.5
         self.damage= 3.5
         self.range= 9.5
-        self.shot_speed=1.0
+        self.shot_speed=3.0
     def update_move(self):
         self.old_pos=self.rect.copy()
         #Right
@@ -67,23 +64,46 @@ class character(pygame.sprite.Sprite):
         if pygame.key.get_pressed()[pygame.K_s] and self.rect.bottom <=Settings.playing_feald.bottom:
             self.rect = self.rect.move(0,self.act_speed*Settings.global_speed)
 
-    def bullit_create(self):
+    def bullet_create(self):
         if pygame.key.get_pressed()[pygame.K_RIGHT]:
-            new_bullet = Bullet(self.rect.centerx+2,self.rect.centery)
-            new_bullet.rect = new_bullet.rect.move(self.shot_speed,0)    #movment logic for the bulits needs to be incabsulated
-            self.bullits.add(new_bullet)
+            new_bullet = Bullet(self.rect.centerx+2,self.rect.centery)    
+            self.bullets_right.add(new_bullet)
+            self.all_bullets.add(new_bullet)
         elif pygame.key.get_pressed()[pygame.K_LEFT]:
             new_bullet = Bullet(self.rect.centerx-2,self.rect.centery)
-            new_bullet.rect = new_bullet.rect.move(self.shot_speed*-1,0)
-            self.bullits.add(new_bullet)
+            self.bullets_left.add(new_bullet)
+            self.all_bullets.add(new_bullet)
         elif pygame.key.get_pressed()[pygame.K_UP]:
             new_bullet = Bullet(self.rect.centerx,self.rect.centery-2)
-            new_bullet.rect = new_bullet.rect.move(0,self.shot_speed*-1)
-            self.bullits.add(new_bullet)
+            self.bullets_up.add(new_bullet)
+            self.all_bullets.add(new_bullet)
         elif pygame.key.get_pressed()[pygame.K_DOWN]:
             new_bullet = Bullet(self.rect.centerx,self.rect.centery+2)
-            new_bullet.rect = new_bullet.rect.move(0,self.shot_speed)
-            self.bullits.add(new_bullet)
+            self.bullets_down.add(new_bullet)
+            self.all_bullets.add(new_bullet)
+    def bullet_move(self):
+        for bullet in self.bullets_right:
+            bullet.rect = bullet.rect.move(self.shot_speed,0)
+        for bullet in self.bullets_left:
+            bullet.rect = bullet.rect.move(self.shot_speed*-1,0)
+        for bullet in self.bullets_up:
+            bullet.rect = bullet.rect.move(0,self.shot_speed*-1)
+        for bullet in self.bullets_down:
+            bullet.rect = bullet.rect.move(0,self.shot_speed)
+    def bullet_kill(self):
+        for bullet in self.all_bullets:
+            if pygame.sprite.spritecollideany(bullet,self.location.room_parts) and bullet.rect.right >= Settings.playing_feald.right:
+                bullet.kill()
+                print("Bullet killed by obstacle")
+
+            
+            
+    def update_bullet(self):
+        self.bullet_create()
+        self.bullet_move()
+        self.bullet_kill()
+            
+            
         
         
 
@@ -233,9 +253,11 @@ class Game(object):
                     self.running = False
                 if event.key == pygame.K_l:
                     Settings.tool()
+                    print(self.character.old_pos)
+                    print(self.character.rect)
     def update(self):
         self.character.update_move()
-        self.character.bullit_create()
+        self.character.update_bullet()
         
         for part in self.aktive_room.room_parts:
             if self.character.rect.colliderect(part): #copilot logic via a copy to reset the pos of the character to a none coliding spot
@@ -246,9 +268,16 @@ class Game(object):
     def draw(self):
         self.screen.blit(self.background_image,(0,200))
         self.screen.blit(self.character.image,self.character.rect.topleft)
-        for bulit in self.character.bullits:
-            self.screen.blit(bulit.image,bulit.rect)
         
+        for bulit in self.character.bullets_right:
+            self.screen.blit(bulit.image,bulit.rect)
+        for bulit in self.character.bullets_left:
+            self.screen.blit(bulit.image,bulit.rect)
+        for bulit in self.character.bullets_up:
+            self.screen.blit(bulit.image,bulit.rect)
+        for bulit in self.character.bullets_down:
+            self.screen.blit(bulit.image,bulit.rect)
+            
         self.screen.blit(self.aktive_room.exitup.image,self.aktive_room.exitup.rect)
         self.screen.blit(self.aktive_room.exitdown.image,self.aktive_room.exitdown.rect)
         self.screen.blit(self.aktive_room.exitright.image,self.aktive_room.exitright.rect)
@@ -270,8 +299,7 @@ class Game(object):
             time_curent = time()
             Settings.DELTATIME = time_curent - time_previous
             time_previous = time_curent
-            print(self.character.old_pos)
-            print(self.character.rect)
+            
         pygame.quit()
 
   
